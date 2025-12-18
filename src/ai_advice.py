@@ -80,7 +80,7 @@ def get_holistic_advice(name, age, condition, history_trend, medications="", lan
         
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",  # Updated from deprecated llama3-8b-8192
             temperature=temp,
             max_tokens=350
         )
