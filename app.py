@@ -307,14 +307,11 @@ with tab1:
                 # H. AI Advice Display
                 if advice_text:
                     advice_title = "🤖 डॉ. स्वास्थ्य की देखभाल योजना" if language == "Hindi" else "🤖 Dr. Swasthya's Care Plan"
-                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
                     st.markdown("---")
                     st.subheader(advice_title)
-                    st.markdown(f"""
-                    <div style="background-color:#F0F8FF;padding:20px;border-radius:10px;border-left:5px solid #008080;margin-bottom:20px;">
-                        {advice_text}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # Use Streamlit container for proper markdown rendering
+                    with st.container():
+                        st.markdown(advice_text)  # Direct markdown rendering - no HTML wrapper
                 
                 # I. Follow-up Date
                 if followup_date:
