@@ -87,14 +87,8 @@ def create_pdf(data, language="English"):
         else:
             pdf.cell(0, 10, "Note: This is a screening tool. Consult a healthcare professional for diagnosis.", ln=True)
         
-        # Fix: pdf.output() returns bytearray, convert to bytes properly
-        pdf_output = pdf.output(dest='S')
-        if isinstance(pdf_output, bytearray):
-            return bytes(pdf_output)
-        elif isinstance(pdf_output, str):
-            return pdf_output.encode('latin-1')
-        else:
-            return pdf_output
+        # fpdf2 returns bytes directly when using output()
+        return pdf.output()
     except Exception as e:
         # Return a minimal error PDF if generation fails
         try:
@@ -102,13 +96,7 @@ def create_pdf(data, language="English"):
             pdf.add_page()
             pdf.set_font("Arial", size=12)
             pdf.cell(0, 10, f"Error generating report: {str(e)}", ln=True)
-            pdf_output = pdf.output(dest='S')
-            if isinstance(pdf_output, bytearray):
-                return bytes(pdf_output)
-            elif isinstance(pdf_output, str):
-                return pdf_output.encode('latin-1')
-            else:
-                return pdf_output
+            return pdf.output()
         except Exception:
             # If even error PDF fails, return empty bytes
             return b''

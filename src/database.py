@@ -25,6 +25,7 @@ def init_db():
     """Initialize database connection (placeholder for compatibility)"""
     pass
 
+@st.cache_data(ttl=300)  # Cache for 5 minutes to avoid quota issues
 def get_history():
     """
     Fetch all patient records from Google Sheet.
@@ -37,7 +38,7 @@ def get_history():
         if conn is None:
             return pd.DataFrame(columns=["Date", "Patient_ID", "Name", "Age", "Gender", "Weight", "Height", 
                                          "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone", "Followup_Date", "Advice"])
-        df = conn.read(worksheet="Sheet1", usecols=list(range(15)), ttl=0)  # ttl=0 means no caching (real-time)
+        df = conn.read(worksheet="Sheet1", usecols=list(range(15)), ttl=300)  # Cache for 5 minutes
         return df.dropna(how="all")
     except Exception as e:
         # Log error but don't crash the app
@@ -91,14 +92,17 @@ def generate_patient_id(name, phone):
 
 def add_record(data):
     """
-    Append a new patient record to the Google Sheet.
+    Append a new patient record to the Google Sheet using batch write (quota-safe).
     
     Args:
         data: Dictionary containing patient information and health metrics
     """
     try:
         conn = get_conn()
-        existing_data = get_history()
+        
+        if conn is None:
+            st.warning("⚠️ Database connection not available. Record not saved. Please configure Google Sheets connection.")
+            return
         
         # Generate Patient ID if not provided
         patient_id = data.get('patient_id') or generate_patient_id(
@@ -125,15 +129,15 @@ def add_record(data):
             "Advice": str(data.get('advice', ''))[:500]  # Limit length
         }])
         
-        # Combine and Update
-        if conn is None:
-            st.warning("⚠️ Database connection not available. Record not saved. Please configure Google Sheets connection.")
-            return
-        
-        # Try to save using update method (requires write access)
+        # ✅ QUOTA-SAFE: Use batch update instead of row-by-row
         try:
+            existing_data = get_history()
             updated_df = pd.concat([existing_data, new_row], ignore_index=True)
             conn.update(worksheet="Sheet1", data=updated_df)
+            
+            # Clear cache after successful write
+            get_history.clear()
+            
             st.success("✅ Record saved successfully!")
         except Exception as update_error:
             error_msg = str(update_error)
