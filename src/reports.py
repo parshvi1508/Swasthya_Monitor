@@ -129,6 +129,6 @@ def get_whatsapp_link(name, score, label, language="English"):
     if language == "Hindi":
         msg = f"नमस्ते {name},\nआपकी स्वास्थ्य जांच रिपोर्ट:\nजोखिम स्कोर: {score}/10\nस्थिति: {label}\nकृपया यदि जोखिम अधिक है तो डॉक्टर से परामर्श करें।"
     else:
-        msg = f"नमस्ते (Hello) {name},\nYour Swasthya Checkup Report:\nRisk Score: {score}/10\nStatus: {label}\nPlease consult a doctor if Risk is High."
+        msg = f"Hello {name},\nYour Swasthya Health Checkup Report:\nRisk Score: {score}/10\nStatus: {label}\nPlease consult a doctor if Risk is High."
     return f"https://wa.me/?text={urllib.parse.quote(msg)}"
 

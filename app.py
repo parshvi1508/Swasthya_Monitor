@@ -59,37 +59,37 @@ with st.sidebar:
     age = st.number_input("Age / उम्र" if language == "Hindi" else "Age", 1, 120, 45)
     gender = st.radio("Gender / लिंग" if language == "Hindi" else "Gender", ["Male", "Female"], horizontal=True)
     
-    st.subheader("Vitals / महत्वपूर्ण संकेत" if language == "Hindi" else "Vitals")
-    weight = st.number_input("Weight (kg) / वजन (किलो)" if language == "Hindi" else "Weight (kg)", 30, 150, 70)
-    height = st.number_input("Height (cm) / ऊंचाई (सेंटीमीटर)" if language == "Hindi" else "Height (cm)", 100, 250, 170)
-    sugar = st.number_input("Fasting Sugar (mg/dL) / रक्त शर्करा" if language == "Hindi" else "Fasting Sugar (mg/dL)", 50, 500, 90)
-    sys_bp = st.number_input("Systolic BP / सिस्टोलिक बीपी" if language == "Hindi" else "Systolic BP", 90, 250, 120)
-    dia_bp = st.number_input("Diastolic BP / डायस्टोलिक बीपी" if language == "Hindi" else "Diastolic BP", 50, 150, 80)
+    st.subheader("महत्वपूर्ण संकेत" if language == "Hindi" else "Vitals")
+    weight = st.number_input("वजन (किलो)" if language == "Hindi" else "Weight (kg)", 30, 150, 70)
+    height = st.number_input("ऊंचाई (सेंटीमीटर)" if language == "Hindi" else "Height (cm)", 100, 250, 170)
+    sugar = st.number_input("उपवास शर्करा (mg/dL)" if language == "Hindi" else "Fasting Sugar (mg/dL)", 50, 500, 90)
+    sys_bp = st.number_input("सिस्टोलिक बीपी" if language == "Hindi" else "Systolic BP", 90, 250, 120)
+    dia_bp = st.number_input("डायस्टोलिक बीपी" if language == "Hindi" else "Diastolic BP", 50, 150, 80)
     
     # Optional: Medications
-    meds = st.text_input("Current Medications (Optional) / वर्तमान दवाएं (वैकल्पिक)" if language == "Hindi" else "Current Medications (Optional)", 
-                         placeholder="e.g., Metformin, Amlodipine")
+    meds = st.text_input("वर्तमान दवाएं (वैकल्पिक)" if language == "Hindi" else "Current Medications (Optional)", 
+                         placeholder="जैसे, Metformin, Amlodipine" if language == "Hindi" else "e.g., Metformin, Amlodipine")
     
     # Optional: Chronotype Detection
     bedtime = None
     waketime = None
-    with st.expander("Sleep Pattern / नींद का पैटर्न (Optional)"):
-        bedtime = st.number_input("Bedtime Hour / सोने का समय (24hr)", 0, 23, 22, 
-                                   help="e.g., 22 for 10 PM", key="bedtime")
-        waketime = st.number_input("Wake Time Hour / जागने का समय (24hr)", 0, 23, 6,
-                                    help="e.g., 6 for 6 AM", key="waketime")
+    with st.expander("नींद का पैटर्न (वैकल्पिक)" if language == "Hindi" else "Sleep Pattern (Optional)"):
+        bedtime = st.number_input("सोने का समय (24 घंटे)" if language == "Hindi" else "Bedtime Hour (24hr)", 0, 23, 22, 
+                                   help="जैसे, 22 का मतलब 10 बजे रात" if language == "Hindi" else "e.g., 22 for 10 PM", key="bedtime")
+        waketime = st.number_input("जागने का समय (24 घंटे)" if language == "Hindi" else "Wake Time Hour (24hr)", 0, 23, 6,
+                                    help="जैसे, 6 का मतलब सुबह 6 बजे" if language == "Hindi" else "e.g., 6 for 6 AM", key="waketime")
     
     analyze_btn = st.button("Run Diagnostics / निदान चलाएं" if language == "Hindi" else "Run Diagnostics", 
                             type="primary")
 
 # 4. Main Area (Tabs)
-tab1, tab2 = st.tabs(["🏥 Current Analysis", "📂 Patient Records"])
+tab1, tab2 = st.tabs(["🏥 वर्तमान विश्लेषण" if language == "Hindi" else "🏥 Current Analysis", "📂 रोगी रिकॉर्ड" if language == "Hindi" else "📂 Patient Records"])
 
 with tab1:
     if analyze_btn:
         # A. Validation
         if not name or not name.strip():
-            st.error("Please enter a patient name.")
+            st.error("कृपया रोगी का नाम दर्ज करें।" if language == "Hindi" else "Please enter a patient name.")
         else:
             errs = logic.validate_inputs(age, weight, height, sugar, sys_bp, dia_bp)
             if errs:
@@ -164,10 +164,10 @@ with tab1:
                 
                 # Chronotype Display (if available)
                 if chronotype:
-                    st.info(f"**Chronotype / नींद का प्रकार:** {chronotype}")
+                    st.info(f"**{'नींद का प्रकार' if language == 'Hindi' else 'Chronotype'}:** {chronotype}")
                 
                 # Row 2: Detailed Factors
-                factors_text = f"**पहचाने गए जोखिम कारक:** {', '.join(factors) if factors else 'कोई नहीं - महत्वपूर्ण संकेत सामान्य'}" if language == "Hindi" else f"**Identified Risk Factors:** {', '.join(factors) if factors else 'None - Vitals Normal'}"
+                factors_text = f"**{'पहचाने गए जोखिम कारक' if language == 'Hindi' else 'Identified Risk Factors'}:** {', '.join(factors) if factors else ('कोई नहीं - महत्वपूर्ण संकेत सामान्य' if language == 'Hindi' else 'None - Vitals Normal')}"
                 st.info(factors_text)
                 
                 # G. Prediction Display
@@ -256,20 +256,20 @@ with tab1:
         st.info(info_text)
 
 with tab2:
-    st.subheader("Hospital Database Records")
+    st.subheader("अस्पताल डेटाबेस रिकॉर्ड" if language == "Hindi" else "Hospital Database Records")
     df = database.get_history()
     
     if df.empty:
-        st.info("No patient records found. Records will appear here after analysis.")
+        st.info("कोई रोगी रिकॉर्ड नहीं मिला। विश्लेषण के बाद रिकॉर्ड यहां दिखाई देंगे।" if language == "Hindi" else "No patient records found. Records will appear here after analysis.")
     else:
         st.dataframe(df, use_container_width=True)
         
         # Population Analytics
         if 'Risk_Score' in df.columns:
-            st.subheader("Population Analytics")
+            st.subheader("जनसंख्या विश्लेषण" if language == "Hindi" else "Population Analytics")
             st.bar_chart(df['Risk_Score'])
         elif 'Label' in df.columns:
-            st.subheader("Population Analytics")
+            st.subheader("जनसंख्या विश्लेषण" if language == "Hindi" else "Population Analytics")
             # Count risk levels if Risk_Score column is missing
             risk_counts = df['Label'].value_counts()
             st.bar_chart(risk_counts)
