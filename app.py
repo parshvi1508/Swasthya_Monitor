@@ -43,6 +43,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 🔹 App Main Title
+st.markdown("""
+<h1 style='text-align:center; color:#008080; margin-bottom:0;'>
+    🏥 Swasthya Monitor
+</h1>
+<p style='text-align:center; color:#555; margin-top:0;'>
+    AI-powered Preventive Health Screening System
+</p>
+<hr>
+""", unsafe_allow_html=True)
+
 # 3. Sidebar (Inputs)
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2966/2966327.png", width=50)
