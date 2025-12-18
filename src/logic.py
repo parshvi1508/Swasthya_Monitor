@@ -1,9 +1,9 @@
-def calculate_scrs(age, bmi, sugar, sys_bp, dia_bp):
+def calculate_scrs(age, bmi, sugar, sys_bp, dia_bp, sleep_hours=None):
     """
     Swasthya Composite Risk Score (SCRS)
-    Input: Vitals
+    Input: Vitals and optional sleep data
     Output: Risk Score (0-10), Risk Level, Color
-    Logic: Asian-Indian Standards
+    Logic: Asian-Indian Standards with sleep integration
     """
     score = 0
     risk_factors = []
@@ -32,7 +32,16 @@ def calculate_scrs(age, bmi, sugar, sys_bp, dia_bp):
         score += 1
         risk_factors.append("Elevated BP")
     
-    # 4. Age Synergy (Risk increases with age)
+    # 4. Sleep Quality (if provided)
+    if sleep_hours is not None:
+        if sleep_hours < 6:
+            score += 1
+            risk_factors.append("Sleep Deprivation")
+        elif sleep_hours > 9:
+            score += 1
+            risk_factors.append("Excessive Sleep")
+    
+    # 5. Age Synergy (Risk increases with age)
     if age > 45 and len(risk_factors) > 0:
         score += 1  # Bonus risk point for age + comorbidity
     

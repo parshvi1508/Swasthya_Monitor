@@ -52,13 +52,34 @@ def create_pdf(data, language="English"):
         
         # AI Advice if available
         if data.get('advice'):
-            advice_text = data.get('advice', '')
-            # Simple text extraction (remove markdown)
-            advice_clean = advice_text.replace('**', '').replace('#', '').strip()
+            advice_text = str(data.get('advice', ''))
+            # Remove markdown, emojis, and special characters
+            advice_clean = advice_text.replace('**', '').replace('#', '').replace('*', '')
+            advice_clean = advice_clean.replace('🤖', '').replace('📋', '').replace('AI-Generated Advice', 'AI Advice')
+            advice_clean = advice_clean.strip()
+            
+            # Encode to latin-1, removing unsupported characters
+            advice_clean = advice_clean.encode('latin-1', 'ignore').decode('latin-1')
+            
             # Split into lines and add
             for line in advice_clean.split('\n'):
-                if line.strip():
-                    pdf.cell(0, 8, line[:80], ln=True)  # Limit line length
+                line_clean = line.strip()
+                if line_clean and len(line_clean) > 2:
+                    # Break long lines
+                    if len(line_clean) > 80:
+                        words = line_clean.split()
+                        current_line = ''
+                        for word in words:
+                            if len(current_line + word) < 80:
+                                current_line += word + ' '
+                            else:
+                                if current_line:
+                                    pdf.cell(0, 6, current_line.strip(), ln=True)
+                                current_line = word + ' '
+                        if current_line:
+                            pdf.cell(0, 6, current_line.strip(), ln=True)
+                    else:
+                        pdf.cell(0, 6, line_clean, ln=True)
         else:
             # Fallback recommendations
             score = data.get('score', 0)
@@ -82,24 +103,39 @@ def create_pdf(data, language="English"):
         
         pdf.ln(5)
         pdf.set_font("Arial", 'I', 8)
-        if language == "Hindi":
-            pdf.cell(0, 10, "नोट: यह एक स्क्रीनिंग उपकरण है। निदान के लिए एक स्वास्थ्य पेशेवर से परामर्श करें।", ln=True)
-        else:
-            pdf.cell(0, 10, "Note: This is a screening tool. Consult a healthcare professional for diagnosis.", ln=True)
+        disclaimer = "Note: This is a screening tool. Consult a healthcare professional for diagnosis."
+        pdf.multi_cell(0, 5, disclaimer)
         
-        # fpdf2 returns bytes directly when using output()
-        return pdf.output()
+        # Return PDF as bytes - try both methods for compatibility
+        try:
+            # For fpdf2 v2.7+
+            pdf_output = pdf.output(dest='S')
+            if isinstance(pdf_output, bytes):
+                return pdf_output
+            elif isinstance(pdf_output, str):
+                return pdf_output.encode('latin-1')
+            else:
+                return bytes(pdf_output)
+        except TypeError:
+            # For older fpdf2 versions
+            return pdf.output()
+            
     except Exception as e:
         # Return a minimal error PDF if generation fails
+        print(f"PDF Generation Error: {str(e)}")
         try:
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.cell(0, 10, f"Error generating report: {str(e)}", ln=True)
-            return pdf.output()
+            error_pdf = FPDF()
+            error_pdf.add_page()
+            error_pdf.set_font("Arial", size=12)
+            error_pdf.cell(0, 10, "Error generating report. Please try again.", ln=True)
+            error_pdf.cell(0, 10, f"Error: {str(e)[:50]}", ln=True)
+            try:
+                return error_pdf.output(dest='S') if hasattr(error_pdf.output, '__call__') else error_pdf.output()
+            except:
+                return error_pdf.output()
         except Exception:
-            # If even error PDF fails, return empty bytes
-            return b''
+            # If even error PDF fails, return None to trigger proper error handling
+            return None
 
 def get_whatsapp_link(name, score, label, language="English"):
     """

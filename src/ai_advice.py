@@ -4,7 +4,7 @@ AI-powered health advice generation using Groq API (Llama-3).
 
 import os
 
-def get_holistic_advice(name, age, condition, history_trend, medications="", language="English"):
+def get_holistic_advice(name, age, condition, history_trend, medications="", language="English", chronotype=None, sleep_hours=None):
     """
     Generates personalized health advice using Llama-3 via Groq API.
     
@@ -15,6 +15,8 @@ def get_holistic_advice(name, age, condition, history_trend, medications="", lan
         history_trend: "positive", "negative", or "stable"
         medications: Current medications (comma-separated)
         language: Language for response ("English" or "Hindi")
+        chronotype: Sleep pattern type ("Early Bird", "Night Owl", "Intermediate")
+        sleep_hours: Total sleep duration in hours
     
     Returns:
         str: AI-generated health advice in markdown format
@@ -33,6 +35,7 @@ def get_holistic_advice(name, age, condition, history_trend, medications="", lan
         
         # Context building
         trend_msg = "Improving" if history_trend == "positive" else "Worsening" if history_trend == "negative" else "Stable"
+        sleep_info = f"\nSleep: {sleep_hours} hours/night, Chronotype: {chronotype}" if sleep_hours and chronotype else ""
         
         # Language-specific prompt
         if language == "Hindi":
@@ -42,7 +45,7 @@ def get_holistic_advice(name, age, condition, history_trend, medications="", lan
             रोगी: {name} ({age} वर्ष)
             वर्तमान स्थिति: {condition}
             प्रवृत्ति: {trend_msg}
-            वर्तमान दवाएं: {medications if medications else 'कोई नहीं'}
+            वर्तमान दवाएं: {medications if medications else 'कोई नहीं'}{sleep_info}
             
             एक "संपूर्ण देखभाल योजना" मार्कडाउन में प्रदान करें:
             
@@ -59,7 +62,7 @@ def get_holistic_advice(name, age, condition, history_trend, medications="", lan
             Patient: {name} ({age} yrs).
             Current Condition: {condition}.
             Trend: {trend_msg}.
-            Current Meds: {medications if medications else 'None'}.
+            Current Meds: {medications if medications else 'None'}.{sleep_info}
             
             Provide a "Hybrid Care Plan" in markdown:
             

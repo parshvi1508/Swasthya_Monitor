@@ -112,15 +112,24 @@ with tab1:
                 patient_id = database.generate_patient_id(name, phone)
                 
                 bmi = round(weight / ((height/100)**2), 1)
-                score, label, color, factors = logic.calculate_scrs(age, bmi, sugar, sys_bp, dia_bp)
                 
                 # Chronotype Detection (if provided)
                 chronotype = None
+                sleep_hours = None
                 if bedtime is not None and waketime is not None:
                     try:
                         chronotype = logic.detect_chronotype(bedtime, waketime)
+                        # Calculate sleep duration
+                        if bedtime > waketime:
+                            sleep_hours = (24 - bedtime) + waketime
+                        else:
+                            sleep_hours = waketime - bedtime
                     except Exception:
                         chronotype = None
+                        sleep_hours = None
+                
+                # Calculate risk score with sleep data
+                score, label, color, factors = logic.calculate_scrs(age, bmi, sugar, sys_bp, dia_bp, sleep_hours)
                 
                 # C. Prediction Logic (ML)
                 history_df = database.get_patient_history(patient_id)
@@ -148,7 +157,7 @@ with tab1:
                 advice_text = None
                 try:
                     with st.spinner("🤖 Generating personalized advice..." if language == "English" else "🤖 व्यक्तिगत सलाह तैयार की जा रही है..."):
-                        advice_text = ai_advice.get_holistic_advice(name, age, label, trend, meds, language)
+                        advice_text = ai_advice.get_holistic_advice(name, age, label, trend, meds, language, chronotype, sleep_hours)
                 except Exception as e:
                     advice_text = ai_advice.get_fallback_advice(label, language)
                 
@@ -196,9 +205,13 @@ with tab1:
                     risk_emoji = "🟢" if score <= 3 else "🟡" if score <= 6 else "🟠" if score <= 8 else "🔴"
                     st.metric("Status", f"{risk_emoji} {label}", delta="")
                 
-                # Chronotype Display (if available)
+                # Chronotype & Sleep Display (if available)
                 if chronotype:
-                    st.info(f"**{'नींद का प्रकार' if language == 'Hindi' else 'Chronotype'}:** {chronotype}")
+                    sleep_quality = "Adequate" if sleep_hours and 7 <= sleep_hours <= 9 else "Poor" if sleep_hours and sleep_hours < 6 else "Excessive" if sleep_hours and sleep_hours > 9 else "Unknown"
+                    if language == "Hindi":
+                        st.info(f"**😴 नींद विश्लेषण:** {chronotype} | {sleep_hours:.1f} घंटे/रात | गुणवत्ता: {sleep_quality}")
+                    else:
+                        st.info(f"**😴 Sleep Analysis:** {chronotype} | {sleep_hours:.1f} hrs/night | Quality: {sleep_quality}")
                 
                 # Row 2: Detailed Risk Factors with Explanations
                 st.markdown("---")
@@ -208,22 +221,51 @@ with tab1:
                     # Create expandable sections for each risk factor
                     for factor in factors:
                         with st.expander(f"⚠️ {factor}", expanded=False):
-                            if "BMI" in factor:
+                            # Check for BMI-related factors
+                            if "Obesity" in factor or "Overweight" in factor or "BMI" in factor:
                                 if bmi < 18.5:
                                     st.write("**Concern:** Underweight increases infection risk and weakens immune system.")
-                                    st.write("**Action:** Increase protein intake, eat nutrient-dense foods.")
+                                    st.write("**Action:** Increase protein intake, eat nutrient-dense foods like nuts, dairy, eggs.")
                                 elif bmi >= 25:
                                     st.write("**Concern:** Excess weight increases risk of diabetes, heart disease, and joint problems.")
-                                    st.write("**Action:** Reduce portion sizes, increase physical activity, avoid sugary drinks.")
-                            elif "Sugar" in factor:
-                                st.write("**Concern:** High blood sugar can damage blood vessels, nerves, kidneys, and eyes over time.")
-                                st.write("**Action:** Limit refined carbs, choose whole grains, exercise regularly, monitor levels.")
-                            elif "BP" in factor or "Blood Pressure" in factor:
-                                st.write("**Concern:** High BP strains heart and arteries, increasing stroke and heart attack risk.")
-                                st.write("**Action:** Reduce salt intake, manage stress, avoid smoking, take medications as prescribed.")
+                                    st.write("**Action:** Reduce portion sizes, increase physical activity to 150 min/week, avoid sugary drinks.")
+                                else:
+                                    st.write("**Status:** Borderline weight. Monitor closely.")
+                                    st.write("**Action:** Maintain balanced diet and regular exercise routine.")
+                            
+                            # Check for Sugar/Diabetes factors
+                            elif "Diabetic" in factor or "Prediabetic" in factor or "Sugar" in factor:
+                                if sugar > 126:
+                                    st.write("**Concern:** Diabetic range - High blood sugar damages blood vessels, nerves, kidneys, and eyes over time.")
+                                    st.write("**Action:** Consult doctor immediately, limit refined carbs, monitor blood sugar daily, take prescribed medications.")
+                                elif sugar > 100:
+                                    st.write("**Concern:** Prediabetic range - High risk of developing diabetes if not controlled.")
+                                    st.write("**Action:** Reduce sugar intake, choose whole grains over white rice/bread, exercise 30 min daily, recheck in 3 months.")
+                            
+                            # Check for Blood Pressure factors
+                            elif "Hypertension" in factor or "Elevated BP" in factor or "BP" in factor or "Blood Pressure" in factor:
+                                if sys_bp >= 140 or dia_bp >= 90:
+                                    st.write("**Concern:** Hypertension - High BP strains heart and arteries, increasing stroke and heart attack risk.")
+                                    st.write("**Action:** Reduce salt to <5g/day, manage stress with yoga/meditation, avoid smoking, take BP medications as prescribed.")
+                                elif sys_bp >= 130 or dia_bp >= 80:
+                                    st.write("**Concern:** Elevated BP - Borderline high blood pressure, needs lifestyle intervention.")
+                                    st.write("**Action:** Limit salt, reduce caffeine, increase potassium-rich foods (banana, spinach), exercise regularly.")
+                            
+                            # Age-related risk
                             elif "Age" in factor:
-                                st.write("**Concern:** Age-related risk increases for chronic conditions.")
-                                st.write("**Action:** Regular health screenings, maintain active lifestyle, balanced nutrition.")
+                                st.write("**Concern:** Age-related risk increases for chronic conditions like diabetes, heart disease.")
+                                st.write("**Action:** Annual comprehensive health screenings, maintain active lifestyle, calcium & vitamin D supplementation.")
+                            
+                            # Generic fallback
+                            elif "Sleep Deprivation" in factor:
+                                st.write("**Concern:** Less than 6 hours of sleep increases risk of heart disease, diabetes, and weakened immunity.")
+                                st.write("**Action:** Establish consistent sleep schedule, avoid screens 1hr before bed, create dark cool room.")
+                            elif "Excessive Sleep" in factor:
+                                st.write("**Concern:** More than 9 hours of sleep may indicate underlying health issues or depression.")
+                                st.write("**Action:** Consult doctor to rule out sleep disorders, maintain regular sleep-wake schedule.")
+                            else:
+                                st.write(f"**Risk Factor:** {factor}")
+                                st.write("**Action:** Consult healthcare provider for personalized advice.")
                 else:
                     st.success("✅ All vitals within normal range! Keep up the healthy lifestyle." if language == "English" else "✅ सभी महत्वपूर्ण संकेत सामान्य सीमा में हैं! स्वस्थ जीवनशैली बनाए रखें।")
                 
@@ -296,7 +338,10 @@ with tab1:
                     'phone': phone,
                     'date': datetime.now().strftime("%Y-%m-%d %H:%M"),
                     'followup_date': followup_date.strftime("%Y-%m-%d") if followup_date else None,
-                    'advice': advice_text or ""
+                    'advice': advice_text or "",
+                    'chronotype': chronotype,
+                    'sleep_hours': sleep_hours,
+                    'factors': factors
                 }
                 database.add_record(record_data)
             
