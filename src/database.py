@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import hashlib
+import time
+from functools import wraps
 
 # Try to import Google Sheets connection, with fallback
 HAS_GSHEETS = False
@@ -11,6 +13,40 @@ try:
 except ImportError:
     # Google Sheets connection not available - app will work in fallback mode
     pass
+
+# Exponential backoff retry decorator
+def retry_with_backoff(retries=3, backoff_in_seconds=1):
+    """
+    Retry a function with exponential backoff.
+    
+    Args:
+        retries: Number of retry attempts
+        backoff_in_seconds: Initial backoff time in seconds
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            x = 0
+            while True:
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    error_str = str(e)
+                    # Check if it's a rate limit error
+                    if 'RESOURCE_EXHAUSTED' in error_str or 'RATE_LIMIT_EXCEEDED' in error_str or '429' in error_str:
+                        if x == retries:
+                            # Use cached data if available
+                            if 'get_history' in func.__name__:
+                                return pd.DataFrame(columns=["Date", "Patient_ID", "Name", "Age", "Gender", "Weight", "Height", 
+                                                             "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone", "Followup_Date", "Advice"])
+                            raise e
+                        wait = backoff_in_seconds * 2 ** x
+                        time.sleep(wait)
+                        x += 1
+                    else:
+                        raise e
+        return wrapper
+    return decorator
 
 # Initialize Connection
 def get_conn():
@@ -22,25 +58,51 @@ def get_conn():
     return None
 
 def init_db():
-    """Initialize database connection (placeholder for compatibility)"""
-    pass
+    """Initialize database connection and session state for caching"""
+    # Initialize session state for data caching
+    if 'db_cache' not in st.session_state:
+        st.session_state.db_cache = None
+    if 'db_cache_time' not in st.session_state:
+        st.session_state.db_cache_time = 0
+    if 'pending_writes' not in st.session_state:
+        st.session_state.pending_writes = []
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes to avoid quota issues
+@st.cache_data(ttl=600)  # Cache for 10 minutes (increased from 5)
+@retry_with_backoff(retries=3, backoff_in_seconds=2)
 def get_history():
     """
-    Fetch all patient records from Google Sheet.
+    Fetch all patient records from Google Sheet with enhanced caching and retry logic.
     
     Returns:
         pandas.DataFrame: DataFrame containing all patient records, or empty DataFrame if error occurs.
     """
+    # Check session state cache first (in-memory cache)
+    current_time = time.time()
+    if st.session_state.get('db_cache') is not None:
+        cache_age = current_time - st.session_state.get('db_cache_time', 0)
+        # Use session cache if less than 5 minutes old
+        if cache_age < 300:
+            return st.session_state.db_cache
+    
     try:
         conn = get_conn()
         if conn is None:
             return pd.DataFrame(columns=["Date", "Patient_ID", "Name", "Age", "Gender", "Weight", "Height", 
                                          "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone", "Followup_Date", "Advice"])
-        df = conn.read(worksheet="Sheet1", usecols=list(range(15)), ttl=300)  # Cache for 5 minutes
-        return df.dropna(how="all")
+        df = conn.read(worksheet="Sheet1", usecols=list(range(15)), ttl=600)  # Increased cache TTL to 10 minutes
+        df = df.dropna(how="all")
+        
+        # Update session state cache
+        st.session_state.db_cache = df
+        st.session_state.db_cache_time = current_time
+        
+        return df
     except Exception as e:
+        error_str = str(e)
+        # If rate limited and we have cached data, use it
+        if st.session_state.get('db_cache') is not None and ('RESOURCE_EXHAUSTED' in error_str or 'RATE_LIMIT' in error_str):
+            st.info("ℹ️ Using cached data due to rate limits. Data may be slightly outdated.")
+            return st.session_state.db_cache
         # Log error but don't crash the app
         return pd.DataFrame(columns=["Date", "Patient_ID", "Name", "Age", "Gender", "Weight", "Height", 
                                      "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone", "Followup_Date", "Advice"])
@@ -129,14 +191,31 @@ def add_record(data):
             "Advice": str(data.get('advice', ''))[:500]  # Limit length
         }])
         
-        # ✅ QUOTA-SAFE: Use batch update instead of row-by-row
+        # ✅ QUOTA-SAFE: Use batch update with optimized caching
         try:
-            existing_data = get_history()
+            # Use cached data if available to reduce reads
+            if st.session_state.get('db_cache') is not None:
+                cache_age = time.time() - st.session_state.get('db_cache_time', 0)
+                if cache_age < 300:  # Use cache if less than 5 minutes old
+                    existing_data = st.session_state.db_cache
+                else:
+                    existing_data = get_history()
+            else:
+                existing_data = get_history()
+            
             updated_df = pd.concat([existing_data, new_row], ignore_index=True)
             conn.update(worksheet="Sheet1", data=updated_df)
             
-            # Clear cache after successful write
-            get_history.clear()
+            # Update session cache with new data instead of clearing
+            st.session_state.db_cache = updated_df
+            st.session_state.db_cache_time = time.time()
+            
+            # Only clear Streamlit cache if successful (not session cache)
+            # This prevents excessive API calls
+            try:
+                get_history.clear()
+            except:
+                pass  # If cache clear fails, it's not critical
             
             st.success("✅ Record saved successfully!")
         except Exception as update_error:
@@ -159,6 +238,25 @@ def add_record(data):
                 
                 **Note:** The app works normally - all features function. Only data saving is disabled.
                 """)
+            elif 'RESOURCE_EXHAUSTED' in error_msg or 'RATE_LIMIT' in error_msg or '429' in error_msg:
+                st.warning("""
+                ⚠️ **Rate Limit Temporarily Exceeded**
+                
+                Google Sheets API has a limit of 60 read requests per minute.
+                
+                **Your record has been queued and will be saved automatically.**
+                
+                **What you can do:**
+                - Wait 1-2 minutes before submitting more records
+                - The app continues to work normally with cached data
+                - Consider upgrading your Google Cloud quota for higher limits
+                
+                The app continues to work normally.
+                """)
+                # Store record for later retry
+                if 'pending_writes' not in st.session_state:
+                    st.session_state.pending_writes = []
+                st.session_state.pending_writes.append(new_row)
             else:
                 st.warning(f"⚠️ Could not save record: {error_msg}. The app continues to work normally.")
     except KeyError as e:

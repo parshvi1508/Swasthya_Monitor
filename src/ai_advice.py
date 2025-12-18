@@ -70,16 +70,27 @@ def get_holistic_advice(name, age, condition, history_trend, medications="", lan
             Keep it strict, short (max 150 words), and empathetic.
             """
         
+        import random
+        
+        # Add slight temperature variation for diverse responses
+        temp = random.uniform(0.6, 0.9)
+        
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
             model="llama3-8b-8192",
-            temperature=0.7,
-            max_tokens=300
+            temperature=temp,
+            max_tokens=350
         )
         
-        return chat_completion.choices[0].message.content
+        advice = chat_completion.choices[0].message.content
+        
+        # Mark that AI was used successfully
+        return f"🤖 **AI-Generated Advice**\n\n{advice}"
     
     except Exception as e:
+        # Log error for debugging
+        import streamlit as st
+        print(f"AI Advice Error: {str(e)}")
         # Fallback to standard advice if AI service fails
         return get_fallback_advice(condition, language)
 
@@ -96,7 +107,7 @@ def get_fallback_advice(condition, language="English"):
     """
     if language == "Hindi":
         advice = """
-        **मानक चिकित्सा सलाह:**
+        📋 **मानक चिकित्सा सलाह** (AI अनुपलब्ध)
         
         1. **आहार**: कम नमक, कम शक्कर, संतुलित भोजन
         2. **व्यायाम**: प्रतिदिन 30 मिनट पैदल चलना
@@ -107,7 +118,7 @@ def get_fallback_advice(condition, language="English"):
         """
     else:
         advice = """
-        **Standard Medical Advice:**
+        📋 **Standard Medical Advice** (AI Unavailable)
         
         1. **Diet**: Low salt, low sugar, balanced meals
         2. **Exercise**: 30 minutes walk daily

@@ -167,33 +167,100 @@ with tab1:
                 with col1:
                     st.metric("Composite Risk", f"{score}/10", delta=label, delta_color="inverse")
                 with col2:
-                    st.metric("BMI", f"{bmi}")
+                    # BMI Category
+                    bmi_category = "Underweight" if bmi < 18.5 else "Normal" if bmi < 25 else "Overweight" if bmi < 30 else "Obese"
+                    st.metric("BMI", f"{bmi}", delta=bmi_category, delta_color="off")
                 with col3:
-                    st.metric("Sugar", f"{sugar} mg/dL")
+                    sugar_status = "Normal" if sugar < 100 else "Prediabetic" if sugar < 126 else "Diabetic"
+                    st.metric("Sugar", f"{sugar} mg/dL", delta=sugar_status, delta_color="inverse" if sugar >= 100 else "normal")
                 with col4:
-                    st.metric("BP", f"{sys_bp}/{dia_bp}")
+                    bp_status = "Normal" if sys_bp < 120 and dia_bp < 80 else "Elevated" if sys_bp < 130 else "High"
+                    st.metric("BP", f"{sys_bp}/{dia_bp}", delta=bp_status, delta_color="inverse" if sys_bp >= 130 else "normal")
+                
+                # Additional Health Indicators Row
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_a, col_b, col_c = st.columns(3, gap="medium")
+                with col_a:
+                    ideal_weight = round(22 * ((height/100)**2), 1)  # BMI 22 is ideal
+                    weight_diff = weight - ideal_weight
+                    st.metric("Ideal Weight", f"{ideal_weight} kg", 
+                             delta=f"{weight_diff:+.1f} kg" if abs(weight_diff) > 2 else "Optimal",
+                             delta_color="inverse" if abs(weight_diff) > 2 else "normal")
+                with col_b:
+                    # Heart Rate Zone (estimated from age)
+                    max_hr = 220 - age
+                    target_hr = round(max_hr * 0.7)  # 70% of max
+                    st.metric("Target Heart Rate", f"{target_hr} bpm", delta=f"Max: {max_hr}")
+                with col_c:
+                    # Risk Level Color Indicator
+                    risk_emoji = "🟢" if score <= 3 else "🟡" if score <= 6 else "🟠" if score <= 8 else "🔴"
+                    st.metric("Status", f"{risk_emoji} {label}", delta="")
                 
                 # Chronotype Display (if available)
                 if chronotype:
                     st.info(f"**{'नींद का प्रकार' if language == 'Hindi' else 'Chronotype'}:** {chronotype}")
                 
-                # Row 2: Detailed Factors
-                factors_text = f"**{'पहचाने गए जोखिम कारक' if language == 'Hindi' else 'Identified Risk Factors'}:** {', '.join(factors) if factors else ('कोई नहीं - महत्वपूर्ण संकेत सामान्य' if language == 'Hindi' else 'None - Vitals Normal')}"
-                st.info(factors_text)
+                # Row 2: Detailed Risk Factors with Explanations
+                st.markdown("---")
+                st.subheader("📊 Risk Factor Analysis" if language == "English" else "📊 जोखिम कारक विश्लेषण")
                 
-                # G. Prediction Display
-                st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
-                if future_pred:
-                    if language == "Hindi":
-                        pred_text = f"📉 **प्रवृत्ति विश्लेषण:** आपके इतिहास के आधार पर, यदि आप वर्तमान आदतें जारी रखते हैं, तो आपकी भविष्यवाणी की गई रक्त शर्करा अगली यात्रा पर **{future_pred.get('Sugar', 'N/A')} mg/dL** होगी।"
-                    else:
-                        pred_text = f"📉 **Trend Analysis:** Based on your history, if you continue current habits, your predicted Sugar next visit is **{future_pred.get('Sugar', 'N/A')} mg/dL**."
-                    st.info(pred_text)
+                if factors:
+                    # Create expandable sections for each risk factor
+                    for factor in factors:
+                        with st.expander(f"⚠️ {factor}", expanded=False):
+                            if "BMI" in factor:
+                                if bmi < 18.5:
+                                    st.write("**Concern:** Underweight increases infection risk and weakens immune system.")
+                                    st.write("**Action:** Increase protein intake, eat nutrient-dense foods.")
+                                elif bmi >= 25:
+                                    st.write("**Concern:** Excess weight increases risk of diabetes, heart disease, and joint problems.")
+                                    st.write("**Action:** Reduce portion sizes, increase physical activity, avoid sugary drinks.")
+                            elif "Sugar" in factor:
+                                st.write("**Concern:** High blood sugar can damage blood vessels, nerves, kidneys, and eyes over time.")
+                                st.write("**Action:** Limit refined carbs, choose whole grains, exercise regularly, monitor levels.")
+                            elif "BP" in factor or "Blood Pressure" in factor:
+                                st.write("**Concern:** High BP strains heart and arteries, increasing stroke and heart attack risk.")
+                                st.write("**Action:** Reduce salt intake, manage stress, avoid smoking, take medications as prescribed.")
+                            elif "Age" in factor:
+                                st.write("**Concern:** Age-related risk increases for chronic conditions.")
+                                st.write("**Action:** Regular health screenings, maintain active lifestyle, balanced nutrition.")
                 else:
-                    if language == "Hindi":
-                        st.caption("ℹ️ प्रवृत्ति पूर्वानुमान के लिए कृपया फिर से आएं।")
-                    else:
-                        st.caption("ℹ️ Visit us again to unlock Trend Predictions.")
+                    st.success("✅ All vitals within normal range! Keep up the healthy lifestyle." if language == "English" else "✅ सभी महत्वपूर्ण संकेत सामान्य सीमा में हैं! स्वस्थ जीवनशैली बनाए रखें।")
+                
+                # G. Historical Trend & Prediction Display
+                st.markdown("---")
+                st.subheader("📈 Health Trends & Predictions" if language == "English" else "📈 स्वास्थ्य प्रवृत्तियाँ और भविष्यवाणियाँ")
+                
+                if not history_df.empty and len(history_df) >= 2:
+                    # Show historical trend chart
+                    col_chart1, col_chart2 = st.columns(2, gap="medium")
+                    
+                    with col_chart1:
+                        if 'Sugar' in history_df.columns:
+                            st.line_chart(history_df[['Sugar']].tail(10), height=200)
+                            st.caption("Blood Sugar Trend (Last 10 visits)" if language == "English" else "रक्त शर्करा प्रवृत्ति (पिछली 10 यात्राएं)")
+                    
+                    with col_chart2:
+                        if 'Risk_Score' in history_df.columns:
+                            st.line_chart(history_df[['Risk_Score']].tail(10), height=200)
+                            st.caption("Risk Score Trend (Last 10 visits)" if language == "English" else "जोखिम स्कोर प्रवृत्ति (पिछली 10 यात्राएं)")
+                    
+                    # Prediction
+                    if future_pred:
+                        trend_emoji = "📈" if trend == "negative" else "📉" if trend == "positive" else "➡️"
+                        if language == "Hindi":
+                            pred_text = f"{trend_emoji} **भविष्यवाणी विश्लेषण:** यदि आप वर्तमान आदतें जारी रखते हैं, तो आपकी अगली यात्रा पर अनुमानित रक्त शर्करा **{future_pred.get('Sugar', 'N/A')} mg/dL** होगी।"
+                        else:
+                            pred_text = f"{trend_emoji} **Prediction Analysis:** If you continue current habits, your predicted Sugar at next visit: **{future_pred.get('Sugar', 'N/A')} mg/dL**."
+                        
+                        if trend == "positive":
+                            st.success(pred_text + " ✅ Improving!" if language == "English" else pred_text + " ✅ सुधार हो रहा है!")
+                        elif trend == "negative":
+                            st.warning(pred_text + " ⚠️ Needs attention!" if language == "English" else pred_text + " ⚠️ ध्यान देने की आवश्यकता!")
+                        else:
+                            st.info(pred_text)
+                else:
+                    st.info("📊 Historical data unavailable. Visit us again to unlock trend predictions and charts!" if language == "English" else "📊 ऐतिहासिक डेटा अनुपलब्ध। प्रवृत्ति भविष्यवाणियों और चार्ट को अनलॉक करने के लिए फिर से आएं!")
                 
                 # H. AI Advice Display
                 if advice_text:
