@@ -11,10 +11,35 @@ database.init_db()
 # 2. Custom CSS for "Clean Minimal UI"
 st.markdown("""
 <style>
-    .block-container {padding-top: 1.5rem; padding-bottom: 1rem;} 
+    .block-container {
+        padding-top: 1.5rem; 
+        padding-bottom: 1rem;
+        max-width: 100%;
+    }
     h1 {color: #008080;}
-    .stButton button {width: 100%; border-radius: 5px;}
-    div[data-testid="stMetricValue"] {font-size: 24px;}
+    h2 {color: #008080; margin-top: 1.5rem;}
+    h3 {color: #2C3E50; margin-top: 1rem;}
+    .stButton button {
+        width: 100%; 
+        border-radius: 5px;
+        margin-top: 0.5rem;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 24px;
+    }
+    [data-testid="stMetric"] {
+        padding: 0.5rem;
+    }
+    .stMarkdown {
+        margin-bottom: 0.5rem;
+    }
+    /* Prevent overlapping on mobile */
+    @media (max-width: 768px) {
+        [data-testid="column"] {
+            width: 100% !important;
+            margin-bottom: 1rem;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,12 +151,16 @@ with tab1:
                 # Patient ID Display
                 st.caption(f"Patient ID: {patient_id}")
                 
-                # Row 1: Key Metrics
-                col1, col2, col3, col4 = st.columns(4)
-                col1.metric("Composite Risk", f"{score}/10", delta=label, delta_color="inverse")
-                col2.metric("BMI", bmi)
-                col3.metric("Sugar", f"{sugar} mg/dL")
-                col4.metric("BP", f"{sys_bp}/{dia_bp}")
+                # Row 1: Key Metrics - Responsive columns
+                col1, col2, col3, col4 = st.columns(4, gap="medium")
+                with col1:
+                    st.metric("Composite Risk", f"{score}/10", delta=label, delta_color="inverse")
+                with col2:
+                    st.metric("BMI", f"{bmi}")
+                with col3:
+                    st.metric("Sugar", f"{sugar} mg/dL")
+                with col4:
+                    st.metric("BP", f"{sys_bp}/{dia_bp}")
                 
                 # Chronotype Display (if available)
                 if chronotype:
@@ -142,6 +171,7 @@ with tab1:
                 st.info(factors_text)
                 
                 # G. Prediction Display
+                st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
                 if future_pred:
                     if language == "Hindi":
                         pred_text = f"📉 **प्रवृत्ति विश्लेषण:** आपके इतिहास के आधार पर, यदि आप वर्तमान आदतें जारी रखते हैं, तो आपकी भविष्यवाणी की गई रक्त शर्करा अगली यात्रा पर **{future_pred.get('Sugar', 'N/A')} mg/dL** होगी।"
@@ -157,10 +187,11 @@ with tab1:
                 # H. AI Advice Display
                 if advice_text:
                     advice_title = "🤖 डॉ. स्वास्थ्य की देखभाल योजना" if language == "Hindi" else "🤖 Dr. Swasthya's Care Plan"
+                    st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
                     st.markdown("---")
                     st.subheader(advice_title)
                     st.markdown(f"""
-                    <div style="background-color:#F0F8FF;padding:20px;border-radius:10px;border-left:5px solid #008080;">
+                    <div style="background-color:#F0F8FF;padding:20px;border-radius:10px;border-left:5px solid #008080;margin-bottom:20px;">
                         {advice_text}
                     </div>
                     """, unsafe_allow_html=True)
@@ -192,27 +223,32 @@ with tab1:
                 database.add_record(record_data)
             
                 # K. Actions (Reports)
+                st.markdown("<br>", unsafe_allow_html=True)  # Add spacing
                 st.divider()
                 export_title = "निर्यात और साझा करें" if language == "Hindi" else "Export & Share"
                 st.subheader(export_title)
-                c1, c2 = st.columns(2)
+                c1, c2 = st.columns(2, gap="medium")
                 with c1:
                     try:
                         pdf_bytes = reports.create_pdf(record_data, language=language)
-                        button_text = "आधिकारिक रिपोर्ट डाउनलोड करें (PDF)" if language == "Hindi" else "Download Official Report (PDF)"
-                        st.download_button(
-                            button_text, 
-                            data=pdf_bytes, 
-                            file_name=f"Swasthya_Report_{patient_id}_{datetime.now().strftime('%Y%m%d')}.pdf", 
-                            mime="application/pdf"
-                        )
+                        if pdf_bytes:
+                            button_text = "आधिकारिक रिपोर्ट डाउनलोड करें (PDF)" if language == "Hindi" else "Download Official Report (PDF)"
+                            st.download_button(
+                                button_text, 
+                                data=pdf_bytes, 
+                                file_name=f"Swasthya_Report_{patient_id}_{datetime.now().strftime('%Y%m%d')}.pdf", 
+                                mime="application/pdf",
+                                use_container_width=True
+                            )
+                        else:
+                            st.error("PDF generation returned empty data")
                     except Exception as e:
                         st.error(f"PDF generation failed: {str(e)}")
                 with c2:
                     try:
                         wa_link = reports.get_whatsapp_link(name, score, label, language)
                         button_text = "WhatsApp पर साझा करें" if language == "Hindi" else "Share via WhatsApp"
-                        st.link_button(button_text, wa_link)
+                        st.link_button(button_text, wa_link, use_container_width=True)
                     except Exception as e:
                         st.error(f"WhatsApp link generation failed: {str(e)}")
     else:

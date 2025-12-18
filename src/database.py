@@ -127,14 +127,43 @@ def add_record(data):
         
         # Combine and Update
         if conn is None:
-            st.warning("Database connection not available. Record not saved.")
+            st.warning("⚠️ Database connection not available. Record not saved. Please configure Google Sheets connection.")
             return
         
-        updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-        conn.update(worksheet="Sheet1", data=updated_df)
+        # Try to save using update method (requires write access)
+        try:
+            updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+            conn.update(worksheet="Sheet1", data=updated_df)
+            st.success("✅ Record saved successfully!")
+        except Exception as update_error:
+            error_msg = str(update_error)
+            if "Public Spreadsheet cannot be written" in error_msg or "Service Account" in error_msg or "cannot be written" in error_msg.lower():
+                st.warning("""
+                ⚠️ **Google Sheets Write Access Required**
+                
+                Your Google Sheet is set to read-only mode. To enable saving records:
+                
+                **Quick Fix (Recommended for Testing):**
+                1. Open your Google Sheet
+                2. Click **"Share"** button (top right)
+                3. Change from **"Viewer"** to **"Editor"** 
+                4. Or select **"Anyone with the link can edit"**
+                5. Refresh this app and try again
+                
+                **For Production (More Secure):**
+                See `GOOGLE_SHEETS_SETUP.md` for Service Account setup instructions.
+                
+                **Note:** The app works normally - all features function. Only data saving is disabled.
+                """)
+            else:
+                st.warning(f"⚠️ Could not save record: {error_msg}. The app continues to work normally.")
     except KeyError as e:
         st.error(f"Missing required field in record data: {str(e)}")
     except Exception as e:
         # If Google Sheets connection fails, log error but don't crash app
-        st.error(f"Failed to save record to database: {str(e)}. Please check your Google Sheets connection.")
+        error_msg = str(e)
+        if "Public Spreadsheet cannot be written" in error_msg:
+            st.warning("⚠️ Google Sheets is read-only. Please enable edit access or use Service Account authentication.")
+        else:
+            st.warning(f"⚠️ Could not save record: {error_msg}. Records will still be displayed.")
 
