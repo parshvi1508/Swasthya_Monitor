@@ -35,10 +35,7 @@ Swasthya-Monitor/
 ├── .gitignore                     # Git ignore rules
 │
 ├── ARCHITECTURE.md                # System architecture docs
-├── CODEBASE_ANALYSIS.md          # Comprehensive codebase analysis
 ├── TEST_CASES.md                 # Test cases documentation
-├── CONTRIBUTING.md               # Contribution guidelines
-├── IMPLEMENTATION_SUMMARY.md     # Feature implementation summary
 └── PROJECT_STRUCTURE.md          # This file
 │
 └── Data Files (optional)

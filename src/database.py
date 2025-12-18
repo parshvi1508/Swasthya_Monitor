@@ -4,12 +4,13 @@ from datetime import datetime
 import hashlib
 
 # Try to import Google Sheets connection, with fallback
+HAS_GSHEETS = False
 try:
     from streamlit_gsheets import GSheetsConnection
     HAS_GSHEETS = True
 except ImportError:
-    HAS_GSHEETS = False
-    st.warning("Google Sheets connection not available. Using fallback mode.")
+    # Google Sheets connection not available - app will work in fallback mode
+    pass
 
 # Initialize Connection
 def get_conn():
@@ -35,13 +36,13 @@ def get_history():
         conn = get_conn()
         if conn is None:
             return pd.DataFrame(columns=["Date", "Patient_ID", "Name", "Age", "Gender", "Weight", "Height", 
-                                         "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone"])
-        df = conn.read(worksheet="Sheet1", usecols=list(range(13)), ttl=0)  # ttl=0 means no caching (real-time)
+                                         "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone", "Followup_Date", "Advice"])
+        df = conn.read(worksheet="Sheet1", usecols=list(range(15)), ttl=0)  # ttl=0 means no caching (real-time)
         return df.dropna(how="all")
     except Exception as e:
         # Log error but don't crash the app
         return pd.DataFrame(columns=["Date", "Patient_ID", "Name", "Age", "Gender", "Weight", "Height", 
-                                     "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone"])
+                                     "BMI", "Sugar", "BP", "Risk_Score", "Label", "Phone", "Followup_Date", "Advice"])
 
 def get_patient_history(patient_id):
     """
@@ -99,9 +100,16 @@ def add_record(data):
         conn = get_conn()
         existing_data = get_history()
         
+        # Generate Patient ID if not provided
+        patient_id = data.get('patient_id') or generate_patient_id(
+            data.get('name', 'Unknown'),
+            data.get('phone', '0000')
+        )
+        
         # Prepare new row with all required fields
         new_row = pd.DataFrame([{
             "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "Patient_ID": patient_id,
             "Name": str(data.get('name', 'Unknown')),
             "Age": int(data.get('age', 0)),
             "Gender": str(data.get('gender', 'Unknown')),
@@ -111,10 +119,17 @@ def add_record(data):
             "Sugar": int(data.get('sugar', 0)),
             "BP": f"{data.get('sys', 0)}/{data.get('dia', 0)}",
             "Risk_Score": int(data.get('score', 0)),
-            "Label": str(data.get('label', 'Unknown'))
+            "Label": str(data.get('label', 'Unknown')),
+            "Phone": str(data.get('phone', '')),
+            "Followup_Date": data.get('followup_date', ''),
+            "Advice": str(data.get('advice', ''))[:500]  # Limit length
         }])
         
         # Combine and Update
+        if conn is None:
+            st.warning("Database connection not available. Record not saved.")
+            return
+        
         updated_df = pd.concat([existing_data, new_row], ignore_index=True)
         conn.update(worksheet="Sheet1", data=updated_df)
     except KeyError as e:

@@ -46,11 +46,13 @@ with st.sidebar:
                          placeholder="e.g., Metformin, Amlodipine")
     
     # Optional: Chronotype Detection
+    bedtime = None
+    waketime = None
     with st.expander("Sleep Pattern / नींद का पैटर्न (Optional)"):
         bedtime = st.number_input("Bedtime Hour / सोने का समय (24hr)", 0, 23, 22, 
-                                   help="e.g., 22 for 10 PM")
+                                   help="e.g., 22 for 10 PM", key="bedtime")
         waketime = st.number_input("Wake Time Hour / जागने का समय (24hr)", 0, 23, 6,
-                                    help="e.g., 6 for 6 AM")
+                                    help="e.g., 6 for 6 AM", key="waketime")
     
     analyze_btn = st.button("Run Diagnostics / निदान चलाएं" if language == "Hindi" else "Run Diagnostics", 
                             type="primary")
@@ -78,13 +80,11 @@ with tab1:
                 
                 # Chronotype Detection (if provided)
                 chronotype = None
-                try:
-                    # Check if bedtime and waketime were provided in the expander
-                    # These are set in the sidebar expander above
-                    chronotype = logic.detect_chronotype(bedtime, waketime)
-                except NameError:
-                    # If not provided, skip chronotype detection
-                    chronotype = None
+                if bedtime is not None and waketime is not None:
+                    try:
+                        chronotype = logic.detect_chronotype(bedtime, waketime)
+                    except Exception:
+                        chronotype = None
                 
                 # C. Prediction Logic (ML)
                 history_df = database.get_patient_history(patient_id)
