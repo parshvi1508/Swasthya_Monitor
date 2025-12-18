@@ -1,0 +1,9 @@
+[theme]
+primaryColor = "#008080"        # Medical Teal (Trustworthy)
+backgroundColor = "#FFFFFF"     # Sterile White
+secondaryBackgroundColor = "#F7F9FB" # Very Light Grey (Sidebar)
+textColor = "#2C3E50"           # Dark Blue-Grey (Readable)
+font = "sans serif"
+
+[server]
+enableCORS = false

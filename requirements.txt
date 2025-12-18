@@ -1,0 +1,7 @@
+streamlit
+pandas
+fpdf2
+plotly
+st-gsheets-connection
+scikit-learn
+groq
